@@ -176,7 +176,7 @@ if run_mode =='test':
 
 
 # initializes population loading old solutions or generating new ones
-
+import pdb; pdb.set_trace()
 if not os.path.exists(experiment_name+'/evoman_solstate'):
 
     print( '\nNEW EVOLUTION\n')
