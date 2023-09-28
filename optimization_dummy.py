@@ -15,6 +15,7 @@ from demo_controller import player_controller
 import numpy as np
 import os
 import argparse
+import pickle
 import pandas as pd
 from time import sleep
 
@@ -97,10 +98,10 @@ def train(enemy_number, Continue, index = 0):
         print("training from scratch")
         sleep(1)
 
-    data_fitness = {'mean': np.array([]), 'std': np.array([])}
-    data_player_hp = {'mean': np.array([]), 'std': np.array([])}
-    data_enemy_hp = {'mean': np.array([]), 'std': np.array([])}
-    data_time = {'mean': np.array([]), 'std': np.array([])}
+    data_fitness = {'mean': np.array([]), 'std': np.array([]), 'max': np.array([])}
+    data_player_hp = {'mean': np.array([]), 'std': np.array([]), 'max': np.array([])}
+    data_enemy_hp = {'mean': np.array([]), 'std': np.array([]), 'max': np.array([])}
+    data_time = {'mean': np.array([]), 'std': np.array([]), 'max': np.array([])}
     for i in range(epoch):
         # data collection
         # mean
@@ -116,6 +117,12 @@ def train(enemy_number, Continue, index = 0):
         data_player_hp['std'] = np.append(data_player_hp['std'], np.std(player_hp))
         data_enemy_hp['std'] = np.append(data_enemy_hp['std'], np.std(enemy_hp))
         data_time['std'] = np.append(data_time['std'], np.std(time))
+
+        # max
+        data_fitness['max'] = np.append(data_fitness['max'], np.max(fitness))
+        data_player_hp['max'] = np.append(data_player_hp['max'], np.max(player_hp))
+        data_enemy_hp['max'] = np.append(data_enemy_hp['max'], np.max(enemy_hp))
+        data_time['max'] = np.append(data_time['max'], np.max(time))
 
         pop = crossover(pop, fitness, p_mutation)
         results = evaluate(env, pop)
@@ -174,6 +181,7 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--mode', type = str, default = 'train')
     parser.add_argument('-n', '--enemy_number', type = int, default = 1)
     parser.add_argument('-c', '--Continue', type = bool, default = True)
+    parser.add_argument('-s', '--seed', type = int, default = 0)
     
     args = parser.parse_args()
 
@@ -188,10 +196,13 @@ if __name__ == '__main__':
         p = np.array([])
         e = np.array([])
         t = np.array([])
-        for i in range(1):
+        for i in range(10):
             data_f, data_p, data_e, data_t = train(args.enemy_number, False, i)
             f = np.append(f, data_f)
             p = np.append(p, data_p)
             e = np.append(e, data_e)
             t = np.append(t, data_t)
+        
+        with open(experiment_name + '/data_f.pkl', 'wb') as file:
+            pickle.dump(f, file)
 
