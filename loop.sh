@@ -1,10 +1,8 @@
 #!/bin/bash
 
-experiment_name='individual_demo'
-
-while [ ! -f $experiment_name"/neuroended" ]
+for i in {1..8}
 do 
-	python optimization_specialist_demo.py
+	python optimization_dummy.py -m data -n $i
 done
 
 exit 0
