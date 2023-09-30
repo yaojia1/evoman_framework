@@ -32,20 +32,32 @@ def evaluate(env, x):
 def init(n_pop, n_vars):
     return np.random.normal(0, 1, (n_pop, n_vars))
 
+def tournament(pop, fitness):
+
+    p1, p2 = np.random.randint(0, pop.shape[0], size = 2)
+
+    return p1 if fitness[p1] > fitness[p2] else p2
+
+
 def crossover(pop, fitness, p_mutation):
 
     n_pop = pop.shape[0]
 
+    pop_new = pop
+
     for i in range(n_pop):
-        p1, p2 = np.random.randint(0, pop.shape[0], size = 2)
-        
+        #p1, p2 = np.random.randint(0, pop.shape[0], size = 2)
+
+        p1 = tournament(pop, fitness)
+        p2 = tournament(pop, fitness)
+
         alpha = np.random.rand()
 
         offspring = alpha * pop[p1] + (1 - alpha) * pop[p2] + (np.random.rand(pop[p1].shape[0]) if np.random.rand() < p_mutation else 0)
 
-        pop = np.vstack((pop, offspring))
+        pop_new = np.vstack((pop_new, offspring))
     
-    return pop
+    return pop_new
 
 def select(n_pop, pop, fitness):
 
@@ -175,6 +187,8 @@ def test(enemy_number, index = 0):
 
     print('fitness {}, player_hp {}, enemy_hp {}, time {}'.format(fitness, player_hp, enemy_hp, time))
 
+    return player_hp - enemy_hp
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
@@ -205,4 +219,15 @@ if __name__ == '__main__':
         
         with open(experiment_name + '/data_f.pkl', 'wb') as file:
             pickle.dump(f, file)
+
+    elif(args.mode == 'data_test'):
+        data = {'score': []}
+        for i in range(10):
+            score = test(args.enemy_number, i)
+            data['score'].append(score)
+        
+        experiment_name = 'solution/' + str(args.enemy_number)
+        with open(experiment_name + '/data_score.pkl', 'wb') as file:
+            pickle.dump(data, file)
+
 
