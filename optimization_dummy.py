@@ -39,17 +39,17 @@ def tournament(pop, fitness):
     return p1 if fitness[p1] > fitness[p2] else p2
 
 
-def crossover(pop, fitness, p_mutation):
+def crossover(pop, fitness, p_mutation, selection):
 
     n_pop = pop.shape[0]
 
     pop_new = pop
 
     for i in range(n_pop):
-        #p1, p2 = np.random.randint(0, pop.shape[0], size = 2)
-
-        p1 = tournament(pop, fitness)
-        p2 = tournament(pop, fitness)
+        if(selection == 'random'):
+            p1, p2 = np.random.randint(0, pop.shape[0], size = 2)
+        elif(selection == 'tournament'):
+            p1, p2 = tournament(pop, fitness), tournament(pop, fitness)
 
         alpha = np.random.rand()
 
@@ -66,7 +66,7 @@ def select(n_pop, pop, fitness):
     return pop[index], fitness[index]
     
 
-def train(enemy_number, Continue, index = 0):
+def train(enemy_number, Continue, selection, index = 0):
     # choose this for not using visuals and thus making experiments faster
     headless = True
     if headless:
@@ -136,7 +136,7 @@ def train(enemy_number, Continue, index = 0):
         data_enemy_hp['max'] = np.append(data_enemy_hp['max'], np.max(enemy_hp))
         data_time['max'] = np.append(data_time['max'], np.max(time))
 
-        pop = crossover(pop, fitness, p_mutation)
+        pop = crossover(pop, fitness, p_mutation, selection)
         results = evaluate(env, pop)
         fitness, player_hp, enemy_hp, time = results[:, 0], results[:, 1], results[:, 2], results[:, 3]        
         pop, fitness = select(n_pop, pop, fitness)
@@ -196,11 +196,12 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--enemy_number', type = int, default = 1)
     parser.add_argument('-c', '--Continue', type = bool, default = True)
     parser.add_argument('-s', '--seed', type = int, default = 0)
+    parser.add_argument('--selection', type = str, default = 'random')
     
     args = parser.parse_args()
 
     if(args.mode == 'train'):
-        train(args.enemy_number, args.Continue)
+        train(args.enemy_number, args.Continue, args.selection)
     elif(args.mode == 'test'):
         test(args.enemy_number)
     elif(args.mode == 'data'):
@@ -211,7 +212,7 @@ if __name__ == '__main__':
         e = np.array([])
         t = np.array([])
         for i in range(10):
-            data_f, data_p, data_e, data_t = train(args.enemy_number, False, i)
+            data_f, data_p, data_e, data_t = train(args.enemy_number, False, args.selection, i)
             f = np.append(f, data_f)
             p = np.append(p, data_p)
             e = np.append(e, data_e)
