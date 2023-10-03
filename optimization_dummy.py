@@ -21,13 +21,19 @@ from time import sleep
 
 # runs simulation
 def simulation(env,x):
-    f, p, e, t = env.play(pcont=x)
+    f, p, e, t = env.play(pcont = x)
     return f, p, e, t
 
 # evaluation
 def evaluate(env, x):
     return np.array(list(map(lambda y: simulation(env,y), x)))
 
+def int2list(enemy_number):
+    s = str(enemy_number)
+    tmp = []
+    for item in s:
+        tmp.append(int(item))
+    return tmp
 
 def init(n_pop, n_vars):
     return np.random.normal(0, 1, (n_pop, n_vars))
@@ -80,14 +86,14 @@ def train(enemy_number, Continue, selection, index = 0):
 
     # initializes simulation in individual evolution mode, for single static enemy.
     env = Environment(experiment_name = experiment_name,
-                    enemies = [enemy_number],
+                    enemies = int2list(enemy_number),
                     playermode = "ai",
                     player_controller = player_controller(n_hidden_neurons), # you can insert your own controller here
                     enemymode = "static",
                     level = 2,
                     speed = "fastest",
                     visuals = False,
-                    randomini = 'no')
+                    multiplemode = 'yes')
 
     # number of weights for multilayer with 10 hidden neurons
     n_vars = (env.get_num_sensors() + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
@@ -169,13 +175,14 @@ def test(enemy_number, index = 0):
     experiment_name = 'solution/' + str(enemy_number)
     # initializes simulation in individual evolution mode, for single static enemy.
     env = Environment(experiment_name = experiment_name,
-                    enemies = [enemy_number],
+                    enemies = int2list(enemy_number),
                     playermode = "ai",
                     player_controller = player_controller(n_hidden_neurons), # you can insert your own controller here
                     enemymode = "static",
                     level = 2,
                     speed = "normal",
-                    visuals = False)
+                    visuals = False,
+                    multiplemode = 'yes')
 
     # number of weights for multilayer with 10 hidden neurons
     n_vars = (env.get_num_sensors() + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
