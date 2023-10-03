@@ -528,7 +528,6 @@ class Environment(object):
 
             # checks player life status
             if self.player.life == 0:
-                print('player fails\n')
                 ends -= 1
 
                 # tells user that player has lost
@@ -550,7 +549,6 @@ class Environment(object):
 
             # checks enemy life status
             if self.enemy.life == 0:
-                print('player wins\n')
                 ends -= 1
                 if self.visuals:
                     self.screen.fill((250,250,250))
