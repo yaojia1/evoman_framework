@@ -44,8 +44,7 @@ def tournament(pop, fitness):
 
     return p1 if fitness[p1] > fitness[p2] else p2
 
-
-def crossover(pop, fitness, p_mutation, selection):
+def crossover(env, pop, fitness, p_mutation, selection):
 
     n_pop = pop.shape[0]
 
@@ -56,10 +55,23 @@ def crossover(pop, fitness, p_mutation, selection):
             p1, p2 = np.random.randint(0, pop.shape[0], size = 2)
         elif(selection == 'tournament'):
             p1, p2 = tournament(pop, fitness), tournament(pop, fitness)
+        elif(selection == 'DE'):
+            while(True):
+                p1, p2 = np.random.randint(0, pop.shape[0], size = 2)
+                if(p1 != i and p2 != i):
+                    break
 
         alpha = np.random.rand()
 
-        offspring = alpha * pop[p1] + (1 - alpha) * pop[p2] + (np.random.rand(pop[p1].shape[0]) if np.random.rand() < p_mutation else 0)
+        if(selection == 'DE'):
+            x = pop[i]
+            v = pop[p1] - pop[p2]
+            u = x + alpha * v
+            l = [x, u, v]
+            f = evaluate(env, l)[:, 0]
+            offspring = l[np.argmax(f)]
+        else: 
+            offspring = alpha * pop[p1] + (1 - alpha) * pop[p2] + (np.random.rand(pop[p1].shape[0]) if np.random.rand() < p_mutation else 0)
 
         pop_new = np.vstack((pop_new, offspring))
     
@@ -142,7 +154,7 @@ def train(enemy_number, Continue, selection, index = 0):
         data_enemy_hp['max'] = np.append(data_enemy_hp['max'], np.max(enemy_hp))
         data_time['max'] = np.append(data_time['max'], np.max(time))
 
-        pop = crossover(pop, fitness, p_mutation, selection)
+        pop = crossover(env, pop, fitness, p_mutation, selection)
         results = evaluate(env, pop)
         fitness, player_hp, enemy_hp, time = results[:, 0], results[:, 1], results[:, 2], results[:, 3]        
         pop, fitness = select(n_pop, pop, fitness)
@@ -201,7 +213,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--mode', type = str, default = 'train')
     parser.add_argument('-n', '--enemy_number', type = int, default = 1)
-    parser.add_argument('-c', '--Continue', type = bool, default = True)
+    parser.add_argument('-c', '--Continue', action = 'store_true')
     parser.add_argument('-s', '--seed', type = int, default = 0)
     parser.add_argument('--selection', type = str, default = 'random')
     
