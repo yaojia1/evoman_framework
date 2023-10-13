@@ -31,12 +31,17 @@ def simulation(env,x):
     f, p, e, t = env.play(pcont = x)
     #return f, p, e, t
     f = 0.8 * (100 - e) + 0.2 * p
-    f = f - numpy.log(t)
+    f = f - 0.01 * t  # numpy.log(t)
+    return f, p, e, t
+def simulation_test(env,x):
+    f, p, e, t = env.play(pcont = x)
     return f, p, e, t
 
 # evaluation
 def evaluate(env, x):
-    return np.array(list(map(lambda y: simulation(env,y), x)))
+    return np.array(list(map(lambda y: simulation_test(env,y), x)))
+def evaluate_test(env, x):
+    return np.array(list(map(lambda y: simulation_test(env,y), x)))
 
 def int2list(enemy_number):
     s = str(enemy_number)
@@ -126,7 +131,7 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
     n_vars = (env.get_num_sensors() + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
     n_pop = 100
     p_mutation = 0.2
-    epoch = 200
+    epoch = 300
 
     # DATA
     genlist = []
@@ -159,6 +164,8 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
             ind.fitness.values = [fitness]
 
     def init_pop(n_pop, n_vars):
+        return np.random.normal(0, 1, (n_pop, n_vars))
+    def init_pop_uniform(n_pop, n_vars):
         return np.random.uniform(-1, 1, (n_pop, n_vars))
 
     def normal_noise(num_vars, p_mutations):
@@ -470,7 +477,7 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
         np.savetxt(experiment_name + "/population.txt", pop)
     def print_2_csv(eponum = None):
         print("SAVE RESULTS TO CSV")
-        with open(experiment_name + '/results.csv', 'w+', newline='') as csvfile:
+        with open(experiment_name + '/results.csv', 'a+', newline='') as csvfile:
             filewriter = csv.writer(csvfile, delimiter=',')
             if eponum == 100:
                 filewriter.writerow(
@@ -606,17 +613,38 @@ def train(enemy_number, Continue, selection, index = 0):
     return data_fitness, data_player_hp, data_enemy_hp, data_time
 
 
-def test(enemy_number, index = 0):
+def test(enemy_number, index = 0, exp_name = None):
     # choose this for not using visuals and thus making experiments faster
     headless = True
     if headless:
         os.environ["SDL_VIDEODRIVER"] = "dummy"
 
     n_hidden_neurons = 10
+    if len(enemy_number) == 1:
+        playmode='no'
+    else:
+        playmode='yes'
 
-    experiment_name = 'solution/' + str(enemy_number)
-    # initializes simulation in individual evolution mode, for single static enemy.
-    env = Environment(experiment_name = experiment_name,
+    if exp_name is not None:
+        experiment_name = exp_name
+        env = Environment(experiment_name=experiment_name,
+                          enemies=enemy_number,
+                          playermode="ai",
+                          player_controller=player_controller(n_hidden_neurons),
+                          # you can insert your own controller here
+                          enemymode="static",
+                          level=2,
+                          speed="fastest",
+                          visuals=True,
+                          multiplemode=playmode)
+        # number of weights for multilayer with 10 hidden neurons
+        n_vars = (env.get_num_sensors() + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
+        pop = np.loadtxt(experiment_name + '/best.txt').reshape(1, n_vars)
+        #print(pop)
+    else:
+        experiment_name = 'solution/' + str(enemy_number)
+        # initializes simulation in individual evolution mode, for single static enemy.
+        env = Environment(experiment_name = experiment_name,
                     enemies = int2list(enemy_number),
                     playermode = "ai",
                     player_controller = player_controller(n_hidden_neurons), # you can insert your own controller here
@@ -625,14 +653,16 @@ def test(enemy_number, index = 0):
                     speed = "normal",
                     visuals = False,
                     multiplemode = 'yes')
+        # number of weights for multilayer with 10 hidden neurons
+        n_vars = (env.get_num_sensors() + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
 
-    # number of weights for multilayer with 10 hidden neurons
-    n_vars = (env.get_num_sensors() + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
+        pop = np.fromfile(experiment_name + '/best.txt'.format(index), dtype=np.float64).reshape(1, n_vars)
 
-    pop = np.fromfile(experiment_name + '/best_{}.bin'.format(index), dtype = np.float64).reshape(1, n_vars)
-    
-    results = evaluate(env, pop)[0]
-    fitness, player_hp, enemy_hp, time = results[0], results[1], results[2], results[3]
+
+
+    #results = evaluate_test(env, pop)[0]
+    fitness, player_hp, enemy_hp, time = env.play(pcont=pop[0])
+    #fitness, player_hp, enemy_hp, time = results[0], results[1], results[2], results[3]
 
     print('fitness {}, player_hp {}, enemy_hp {}, time {}'.format(fitness, player_hp, enemy_hp, time))
 
@@ -641,7 +671,7 @@ def test(enemy_number, index = 0):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--mode', type = str, default = 'generation_train')
+    parser.add_argument('-m', '--mode', type = str, default = 'generation_train')  # gen_test')
     parser.add_argument('-n', '--enemy_number', type = int, default = 1)
     parser.add_argument('-c', '--Continue', action = 'store_true')
     parser.add_argument('-s', '--seed', type = int, default = 0)
@@ -680,6 +710,21 @@ if __name__ == '__main__':
         experiment_name = 'solution/' + str(args.enemy_number)
         with open(experiment_name + '/data_score.pkl', 'wb') as file:
             pickle.dump(data, file)
+
+    elif (args.mode == 'gen_test'):
+        data = {'score': []}
+        enemy_groups = {1: [1, 2, 3, 4, 5, 6, 7, 8]}  #, 2: [4, 6, 7], 3: [2, 6, 8]}
+
+        for group_number, enemies_in_group in enemy_groups.items():
+            exp_name = 'group12345678/DA_best'
+            print(enemies_in_group)
+            score = test(enemies_in_group, group_number, exp_name)
+            data['score'].append(score)
+            for i in range(8):
+                l = [enemies_in_group[i],enemies_in_group[7-i]]
+                print(l)
+                score = test(l, group_number, exp_name)
+                data['score'].append(score)
 
     elif (args.mode == 'generation_train'):
         print("------------------------------- START TRAIN -------------------------------------------------------")
