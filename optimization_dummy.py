@@ -8,6 +8,8 @@
 # imports framework
 import sys
 
+import numpy
+
 from evoman.environment import Environment
 from demo_controller import player_controller
 
@@ -23,12 +25,14 @@ import random
 import csv
 from random import shuffle
 DEBUG_T = 1
-
+RESERVE_Best = 5
 # runs simulation
 def simulation(env,x):
     f, p, e, t = env.play(pcont = x)
+    #return f, p, e, t
+    f = 0.8 * (100 - e) + 0.2 * p
+    f = f - numpy.log(t)
     return f, p, e, t
-    # return p-e, p, e, t
 
 # evaluation
 def evaluate(env, x):
@@ -157,11 +161,19 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
     def init_pop(n_pop, n_vars):
         return np.random.uniform(-1, 1, (n_pop, n_vars))
 
-    def init_noise(n_vars, p_mutation):
-        return np.clip(np.random.normal(0, 1, n_vars), -p_mutation, p_mutation)
+    def normal_noise(num_vars, p_mutations):
+        noise = np.random.normal(0, 1, n_vars)
+        for i in range(num_vars):
+            if noise[i] > p_mutations:
+                noise[i] = p_mutations
+            elif noise[i] < - p_mutations:
+                noise[i] = - p_mutations
+        return noise
+    def uniform_noise(num_vars, p_mutations):
+        return np.random.uniform(-p_mutations, p_mutations, num_vars)
 
-    def random_noise(n_vars, p_mutation):
-        return np.random.uniform(-p_mutation, p_mutation, n_vars)
+    def random_noise(num_vars, p_mutations):
+        return uniform_noise(num_vars, p_mutations)
 
     def tournament(pop, fitness):
         p1, p2 = np.random.randint(0, pop.shape[0], size=2)
@@ -221,12 +233,13 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
         if DEBUG_T == 1:
             pass  # print(index_pop, "\n", np.shape(index_pop), np.shape(pop))
         for i in range(n_pop):
-            p1 = index_pop[i]
-            p2 = index_pop[i + n_pop]
-            pn = tournament_221(p1, p2, pop, fitness)
             if i == 0:
+                pn = np.argmax(fitness)
                 new_pop = [pop[pn]]
             else:
+                p1 = index_pop[i]
+                p2 = index_pop[i + n_pop]
+                pn = tournament_221(p1, p2, pop, fitness)
                 l = [pop[pn]]
                 new_pop = np.vstack((new_pop, l))
             l2 = [fitness[pn], player_hp[pn], enemy_hp[pn], time[pn]]
@@ -411,7 +424,6 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
         results = evaluate(env, pop)
         fitness, player_hp, enemy_hp, time = results[:, 0], results[:, 1], results[:, 2], results[:, 3]
         while current_g < epoch:
-            current_g = current_g + 1
             print("-- Generation %i --" % current_g)
 
             # 1. mate and crossover and/or mutate
@@ -449,17 +461,23 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
             solutions = [pop, fitness]
             env.update_solutions(solutions)
             env.save_state()
-
+            current_g = current_g + 1
+            if current_g % 100 == 0:
+                save_pop(pop)
+                print_2_csv(current_g)
         return pop
-
-    def print_2_csv():
+    def save_pop(pop):
+        np.savetxt(experiment_name + "/population.txt", pop)
+    def print_2_csv(eponum = None):
         print("SAVE RESULTS TO CSV")
         with open(experiment_name + '/results.csv', 'w+', newline='') as csvfile:
             filewriter = csv.writer(csvfile, delimiter=',')
-            filewriter.writerow(
-                ["generation", "fitness_max", "mean", "std", "player_hp_max", "mean", "std", "enemy_hp_max", "mean",
-                 "std", "time_max", "mean", "std"])
-            for i in range(epoch):
+            if eponum == 100:
+                filewriter.writerow(
+                    ["generation", "fitness_max", "mean", "std", "player_hp_max", "mean", "std", "enemy_hp_max", "mean",
+                     "std", "time_max", "mean", "std"])
+
+            for i in range(eponum-100,eponum):
                 filewriter.writerow([i + 1, data_fitness['max'][i], data_fitness['mean'][i], data_fitness['std'][i],
                                      data_player_hp['max'][i], data_player_hp['mean'][i], data_player_hp['std'][i],
                                      data_enemy_hp['max'][i], data_enemy_hp['mean'][i], data_enemy_hp['std'][i],
@@ -490,7 +508,7 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
         else:
             pop_ini = init_pop(n_pop, n_vars)
             pop = evolution(pop_ini, -100, selection)
-        print_2_csv()
+        print_2_csv(epoch)
         return winner, pop
 
     main(pop1, pop2)
@@ -623,11 +641,12 @@ def test(enemy_number, index = 0):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--mode', type = str, default = 'dgeneration_train')
+    parser.add_argument('-m', '--mode', type = str, default = 'generation_train')
     parser.add_argument('-n', '--enemy_number', type = int, default = 1)
     parser.add_argument('-c', '--Continue', action = 'store_true')
     parser.add_argument('-s', '--seed', type = int, default = 0)
     parser.add_argument('--selection', type = str, default = 'random')
+    #parser.add_argument('--noise', type=str, default='normal') # or uniform
     
     args = parser.parse_args()
 
@@ -662,7 +681,7 @@ if __name__ == '__main__':
         with open(experiment_name + '/data_score.pkl', 'wb') as file:
             pickle.dump(data, file)
 
-    elif (args.mode == 'dgeneration_train'):
+    elif (args.mode == 'generation_train'):
         print("------------------------------- START TRAIN -------------------------------------------------------")
         # --------- STARTS PROGRAM FOR EVERY ENEMY GROUP 10 TIMES ---------------
         enemy_groups = {1: [2, 6, 8], 2: [4, 6, 7], 3: [1, 2, 3, 4, 5, 6, 7, 8], 4: [1, 2, 3, 4, 5, 6, 7, 8]}
