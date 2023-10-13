@@ -671,7 +671,7 @@ def test(enemy_number, index = 0, exp_name = None):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--mode', type = str, default = 'generation_train')  # gen_test')
+    parser.add_argument('-m', '--mode', type = str, default = 'gen_test')  # 'generation_train')  #
     parser.add_argument('-n', '--enemy_number', type = int, default = 1)
     parser.add_argument('-c', '--Continue', action = 'store_true')
     parser.add_argument('-s', '--seed', type = int, default = 0)
@@ -716,7 +716,7 @@ if __name__ == '__main__':
         enemy_groups = {1: [1, 2, 3, 4, 5, 6, 7, 8]}  #, 2: [4, 6, 7], 3: [2, 6, 8]}
 
         for group_number, enemies_in_group in enemy_groups.items():
-            exp_name = 'group12345678/DA_best'
+            exp_name = 'solution'
             print(enemies_in_group)
             score = test(enemies_in_group, group_number, exp_name)
             data['score'].append(score)
@@ -725,6 +725,12 @@ if __name__ == '__main__':
                 print(l)
                 score = test(l, group_number, exp_name)
                 data['score'].append(score)
+            for i in range(8):
+                exp_name = 'group12345678'
+                print(i)
+                score = test([i+1], 1, exp_name)
+                data['score'].append(score)
+
 
     elif (args.mode == 'generation_train'):
         print("------------------------------- START TRAIN -------------------------------------------------------")
