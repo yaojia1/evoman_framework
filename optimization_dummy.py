@@ -99,38 +99,62 @@ def select(n_pop, pop, fitness):
     return pop[index], fitness[index]
 
 
-def generalist_train(experiment_name, enemies_in_group, selection, mode=None, pop1=None, pop2=None):
-    if not os.path.exists(experiment_name):
-        os.makedirs(experiment_name)
-
-    if os.path.exists(experiment_name + '/results.csv'):
-        os.remove(experiment_name + '/results.csv')
-
-    if os.path.exists(experiment_name + '/best.txt'):
-        os.remove(experiment_name + '/best.txt')
+def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 0.2, mode=None, pop1=None, pop2=None):
+    if selection is not None:
+        experiment_name = experiment_name + "_" + selection
+    experiment_name = experiment_name + "_p_" + str(p_mutation)
 
     n_hidden_neurons = 10
     if pop2 is None:
         pop2 = []
     if pop1 is None:
         pop1 = []
-
+    print("selection is "+str(selection)+"\nmode:"+str(mode))
+    selections = ["random", "DE"]
     # initializes simulation in individual evolution mode, for single static enemy.
-    env = Environment(
-        experiment_name=experiment_name,
-        enemies=enemies_in_group,
-        multiplemode="yes",
-        playermode="ai",
-        player_controller=player_controller(n_hidden_neurons),
-        enemymode="static",
-        level=2,
-        speed="fastest",
-    )
+    if mode == "two":
+        if not os.path.exists(experiment_name + "_" + selections[0]):
+            os.makedirs(experiment_name + "_" + selections[0])
+
+        if os.path.exists(experiment_name + "_" + selections[0] + '/results.csv'):
+            os.remove(experiment_name + "_" + selections[0] + '/results.csv')
+
+        if os.path.exists(experiment_name + "_" + selections[0] + '/best.txt'):
+            os.remove(experiment_name + "_" + selections[0] + '/best.txt')
+        env = Environment(
+            experiment_name=experiment_name + "_" + selections[0],
+            enemies=enemies_in_group,
+            multiplemode="yes",
+            playermode="ai",
+            player_controller=player_controller(n_hidden_neurons),
+            enemymode="static",
+            level=2,
+            speed="fastest",
+        )
+    else:
+        if not os.path.exists(experiment_name):
+            os.makedirs(experiment_name)
+
+        if os.path.exists(experiment_name + '/results.csv'):
+            os.remove(experiment_name + '/results.csv')
+
+        if os.path.exists(experiment_name + '/best.txt'):
+            os.remove(experiment_name + '/best.txt')
+        env = Environment(
+            experiment_name=experiment_name,
+            enemies=enemies_in_group,
+            multiplemode="yes",
+            playermode="ai",
+            player_controller=player_controller(n_hidden_neurons),
+            enemymode="static",
+            level=2,
+            speed="fastest",
+        )
+
     # GLOBAL VARIABLES
     toolbox = base.Toolbox()
     n_vars = (env.get_num_sensors() + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
     n_pop = 100
-    p_mutation = 0.2
     epoch = 300
 
     # DATA
@@ -164,6 +188,7 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
             ind.fitness.values = [fitness]
 
     def init_pop(n_pop, n_vars):
+        random.seed(42)
         return np.random.normal(0, 1, (n_pop, n_vars))
     def init_pop_uniform(n_pop, n_vars):
         return np.random.uniform(-1, 1, (n_pop, n_vars))
@@ -204,7 +229,7 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
     def tournament_221(p1, p2, pop, fitness):
         return p1 if fitness[p1] > fitness[p2] else p2
 
-    def crose_two_point(ind1, ind2):
+    def cross_two_point(ind1, ind2):
         """Executes a two-point crossover on the input :term:`sequence`
                     individuals. The two individuals are modified in place and both keep
                     their original length.
@@ -263,7 +288,7 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
         n_pop = pop.shape[0]
 
         child_new = []
-        if (selection == 'DE'):
+        if (selection == 'DE_old'):
             for i in range(n_pop):
                 alpha = np.random.rand()
                 while (True):
@@ -294,7 +319,7 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
                 else:
                     child_new = np.vstack((child_new, [child]))
                 # print(np.shape(child_new))
-        elif (selection == 'DE_mutation'):
+        elif (selection == 'DE'):
             for i in range(n_pop):
                 alpha = np.random.rand()
                 while (True):
@@ -303,11 +328,12 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
                         break
                 x = pop[i] + random_noise(n_vars, p_mutation)  # / 2)
                 v = pop[p1] - pop[p2]
-                v = v + random_noise(n_vars, p_mutation)  # / 2)
-                u = x + alpha * v
-                u = u + random_noise(n_vars, p_mutation)  # / 2)
+                #v = v + random_noise(n_vars, p_mutation)  # / 2)
+                child = x + alpha * v
+                #u = u + random_noise(n_vars, p_mutation)  # / 2)
+                """
                 l = [x, u, v]
-
+                
                 f = evaluate(env, l)[:, 0]
 
                 # print(np.shape(x), np.shape(v), np.shape(u), np.shape(f), f, np.shape(l[np.argmax(f)]))
@@ -321,7 +347,8 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
                         child = l[1]  # child_new = np.vstack((child_new, l[1]))
                     else:
                         child = l[2]  # child_new = np.vstack((child_new, l[2]))
-
+                        
+                        """
                 if i == 0:
                     child_new = [child]
                 else:
@@ -336,7 +363,7 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
                 i += 1
                 # if (i == 0 and DEBUG_T == 1):
                 # print("crossover parent: ", pop[parent1])
-                child1, child2 = crose_two_point(pop[parent1], pop[parent2])
+                child1, child2 = cross_two_point(pop[parent1], pop[parent2])
                 # if (i == 0 and DEBUG_T == 1):
                 # print("crossover: ", child1, child2)
                 child1 = np.array(child1)
@@ -385,7 +412,7 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
         if fitness_best > ultimate_best:
             print("ultimate best %s :" % index_best)
             ultimate_best = fitness_best
-            np.savetxt(experiment_name + "/best.txt", pop_best)
+            np.savetxt(env.experiment_name + "/best.txt", pop_best)
         if fitness_best > winner["fitness"]:
             print("WINNER")
             winner["solution"] = pop_best
@@ -437,7 +464,7 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
             offspring = np.array(crossover_mutate(env, pop, fitness, n_pop, p_mutation, selection))
             # 2. evaluate offspring
             if (DEBUG_T == 1):
-                print(offspring.shape)
+                pass #print(offspring.shape)
             results = evaluate(env, offspring)
             fitness = np.append(fitness, results[:, 0])
             player_hp = np.append(player_hp, results[:, 1])
@@ -474,10 +501,10 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
                 print_2_csv(current_g)
         return pop
     def save_pop(pop):
-        np.savetxt(experiment_name + "/population.txt", pop)
-    def print_2_csv(eponum = None):
+        np.savetxt(env.experiment_name  + "/population.txt", pop)
+    def print_2_csv(eponum = None, selection_tmp = None):
         print("SAVE RESULTS TO CSV")
-        with open(experiment_name + '/results.csv', 'a+', newline='') as csvfile:
+        with open(env.experiment_name + '/results.csv', 'a+', newline='') as csvfile:
             filewriter = csv.writer(csvfile, delimiter=',')
             if eponum == 100:
                 filewriter.writerow(
@@ -518,7 +545,43 @@ def generalist_train(experiment_name, enemies_in_group, selection, mode=None, po
         print_2_csv(epoch)
         return winner, pop
 
-    main(pop1, pop2)
+    if mode == "two":
+        pop_ini = init_pop(n_pop, n_vars)
+        pop_old = pop_ini[:]
+        evolution(pop_ini, -100, "DE")
+
+        if not os.path.exists(experiment_name + "_" + selections[1]):
+            os.makedirs(experiment_name + "_" + selections[1])
+
+        if os.path.exists(experiment_name + "_" + selections[1] + '/results.csv'):
+            os.remove(experiment_name + "_" + selections[1] + '/results.csv')
+
+        if os.path.exists(experiment_name + "_" + selections[1] + '/best.txt'):
+            os.remove(experiment_name + "_" + selections[1] + '/best.txt')
+
+        env = Environment(
+            experiment_name=experiment_name + "_" + selections[1],
+            enemies=enemies_in_group,
+            multiplemode="yes",
+            playermode="ai",
+            player_controller=player_controller(n_hidden_neurons),
+            enemymode="static",
+            level=2,
+            speed="fastest",
+        )
+        # DATA
+        genlist = []
+        winner = {"solution": [], "fitness": -200}
+        data_fitness = {'mean': np.array([]), 'std': np.array([]), 'max': np.array([])}
+        data_player_hp = {'mean': np.array([]), 'std': np.array([]), 'max': np.array([])}
+        data_enemy_hp = {'mean': np.array([]), 'std': np.array([]), 'max': np.array([])}
+        data_time = {'mean': np.array([]), 'std': np.array([]), 'max': np.array([])}
+        data_bestfit = {'fitness': np.array([]), 'player_hp': np.array([]), 'enemy_hp': np.array([]),
+                        'time': np.array([])}
+
+        evolution(pop_old, -100, "random")
+    else:
+        main(pop1, pop2)
 
 
 def train(enemy_number, Continue, selection, index = 0):
@@ -626,7 +689,12 @@ def test(enemy_number, index = 0, exp_name = None):
         playmode='yes'
 
     if exp_name is not None:
-        experiment_name = exp_name
+        name = ''.join(str(x) for x in enemy_number)
+        experiment_name = exp_name+"/test" #+ name
+        print(experiment_name)
+        if not os.path.exists(experiment_name):
+            os.makedirs(experiment_name)
+
         env = Environment(experiment_name=experiment_name,
                           enemies=enemy_number,
                           playermode="ai",
@@ -639,10 +707,14 @@ def test(enemy_number, index = 0, exp_name = None):
                           multiplemode=playmode)
         # number of weights for multilayer with 10 hidden neurons
         n_vars = (env.get_num_sensors() + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
-        pop = np.loadtxt(experiment_name + '/best.txt').reshape(1, n_vars)
+        pop = np.loadtxt(exp_name + '/best.txt').reshape(1, n_vars)
         #print(pop)
     else:
         experiment_name = 'solution/' + str(enemy_number)
+        exp_name = 'solution/'
+        if not os.path.exists(experiment_name):
+            os.makedirs(experiment_name)
+
         # initializes simulation in individual evolution mode, for single static enemy.
         env = Environment(experiment_name = experiment_name,
                     enemies = int2list(enemy_number),
@@ -656,7 +728,7 @@ def test(enemy_number, index = 0, exp_name = None):
         # number of weights for multilayer with 10 hidden neurons
         n_vars = (env.get_num_sensors() + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
 
-        pop = np.fromfile(experiment_name + '/best.txt'.format(index), dtype=np.float64).reshape(1, n_vars)
+        pop = np.fromfile(exp_name + '/best.txt'.format(index), dtype=np.float64).reshape(1, n_vars)
 
 
 
@@ -671,7 +743,7 @@ def test(enemy_number, index = 0, exp_name = None):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--mode', type = str, default = 'gen_test')  # 'generation_train')  #
+    parser.add_argument('-m', '--mode', type = str, default = 'generation_train')  # 'generation_train')  #
     parser.add_argument('-n', '--enemy_number', type = int, default = 1)
     parser.add_argument('-c', '--Continue', action = 'store_true')
     parser.add_argument('-s', '--seed', type = int, default = 0)
@@ -711,42 +783,50 @@ if __name__ == '__main__':
         with open(experiment_name + '/data_score.pkl', 'wb') as file:
             pickle.dump(data, file)
 
-    elif (args.mode == 'gen_test'):
+    elif (args.mode == 'generation_test'):
         data = {'score': []}
         enemy_groups = {1: [1, 2, 3, 4, 5, 6, 7, 8]}  #, 2: [4, 6, 7], 3: [2, 6, 8]}
+        solution_names= ['group12345678_DE','group12345678_random']
+        for exp_name in solution_names:
+            for group_number, enemies_in_group in enemy_groups.items():
+                #exp_name = 'group12345678_DE'
+                print(enemies_in_group)
+                score = test(enemies_in_group, group_number, exp_name)
+                data['score'].append(score)
+                """
+                for i in range(8):
+                    l = [enemies_in_group[i],enemies_in_group[7-i]]
+                    print(l)
+                    score = test(l, group_number, exp_name)
+                    data['score'].append(score)
+                """
+                for i in range(8):
+                    # exp_name = 'group12345678'
+                    print(i)
+                    score = test([i + 1], 1, exp_name)
+                    data['score'].append(score)
 
-        for group_number, enemies_in_group in enemy_groups.items():
-            exp_name = 'solution'
-            print(enemies_in_group)
-            score = test(enemies_in_group, group_number, exp_name)
-            data['score'].append(score)
-            for i in range(8):
-                l = [enemies_in_group[i],enemies_in_group[7-i]]
-                print(l)
-                score = test(l, group_number, exp_name)
-                data['score'].append(score)
-            for i in range(8):
-                exp_name = 'group12345678'
-                print(i)
-                score = test([i+1], 1, exp_name)
-                data['score'].append(score)
+
+        print(data['score'])
 
 
     elif (args.mode == 'generation_train'):
         print("------------------------------- START TRAIN -------------------------------------------------------")
         # --------- STARTS PROGRAM FOR EVERY ENEMY GROUP 10 TIMES ---------------
-        enemy_groups = {1: [2, 6, 8], 2: [4, 6, 7], 3: [1, 2, 3, 4, 5, 6, 7, 8], 4: [1, 2, 3, 4, 5, 6, 7, 8]}
+        enemy_groups = {1: [2, 3, 6, 8], 2: [4, 5, 6, 7], 3: [1, 2, 3, 4, 5, 6, 7, 8], 4: [1, 2, 3, 4, 5, 6, 7, 8]}
         pops = [1, 2, 3]
         for group_number, enemies_in_group in enemy_groups.items():
             group_name = ''.join(str(x) for x in enemies_in_group)
             print("------------ GROUP " + str(group_name) + " -------------------------------------------------------")
             experiment_name = "group" + str(group_name)
             if group_number < 3:
-                continue
-                # pops[group_number-1] = generalist_train(experiment_name, enemies_in_group,args.selection)
+                #continue
+                # pops[group_number-1] =
+                generalist_train(experiment_name, enemies_in_group, None, mode="two")
             elif group_number == 3:
                 experiment_name = "group_coevo"
                 # pops[group_number - 1] = generalist_train(experiment_name, enemies_in_group, args.selection, mode="all",
                 # pop1=pops[0], pop2=pops[1])
             else:
-                generalist_train(experiment_name, enemies_in_group, args.selection)
+                #pass
+                generalist_train(experiment_name, enemies_in_group, None, mode="two")
