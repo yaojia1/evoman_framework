@@ -169,24 +169,6 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
     data_time = {'mean': np.array([]), 'std': np.array([]), 'max': np.array([])}
     data_bestfit = {'fitness': np.array([]), 'player_hp': np.array([]), 'enemy_hp': np.array([]), 'time': np.array([])}
 
-    def evaluate_all(pop, l):
-        """
-        This function will start a game with one individual from the population
-
-        Args:
-            individual (np.ndarray of Floats between -1 and 1): One individual from the population
-
-        Returns:
-            Float: Fitness
-        """
-        for ind in pop:
-            f, p, e, t = env.play(
-                pcont=ind
-            )  # return fitness, self.player.life, self.enemy.life, self.time
-            fitness = f  # +p - e
-            # TODO return fitness with other weight
-            ind.fitness.values = [fitness]
-
     def init_pop(n_pop, n_vars):
         random.seed(42)
         return np.random.normal(0, 1, (n_pop, n_vars))
@@ -207,15 +189,15 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
     def random_noise(num_vars, p_mutations):
         return uniform_noise(num_vars, p_mutations)
 
-    def tournament(pop, fitness):
-        p1, p2 = np.random.randint(0, pop.shape[0], size=2)
-
-        return p1 if fitness[p1] > fitness[p2] else p2
+    def tournament(pop, fitness, k):
+        parents = np.random.randint(0, pop.shape[0], size=k)
+        pn = np.argmax(parents)
+        return pn
 
     def tournament_select(pop, k, fitness):
         chosen = []
         for i in range(k):
-            chosen = np.append(chosen, tournament(pop, fitness))
+            chosen = np.append(chosen, tournament(pop, fitness, k))
         # if (DEBUG_T == 1):
         #    print(chosen[0])
         return chosen
@@ -286,6 +268,29 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
             # print("shape of fit result ", np.shape(fitness), np.shape(new_fitness))
 
         return new_pop, new_fitness, new_php, new_ehp, new_time
+    def round_robin_tournament(p1, k, pop, fitness):
+        contestants = np.random.randint(0, pop.shape[0], size=k+1)
+        win = 0
+        for contestant in contestants:
+            if p1 == contestant:
+                continue
+            if fitness[p1] >= fitness[contestant]:
+                win += 1
+        return win
+    def round_robin_tournament_survivor(n_pop, pop, fitness, player_hp, enemy_hp, time):
+        wins = []
+        for i in range(np.shape(pop)[0]):
+            wins.append(round_robin_tournament(i, 10, pop, fitness))
+        wins_arg = np.argsort(wins)[-n_pop:]
+        new_pop = pop[wins_arg] #best n pop winners
+        new_fitness = [wins_arg]  # = fitness[:]
+        new_php = [wins_arg]  # player_hp[:]
+        new_ehp = [wins_arg]  # enemy_hp[:]
+        new_time = [wins_arg]  # time[:]
+        # print("shape of result ", np.shape(new_pop))
+        # print("shape of fit result ", np.shape(fitness), np.shape(new_fitness))
+        return new_pop, new_fitness, new_php, new_ehp, new_time
+
 
     def crossover_mutate(env, pop, fitness, k, p_mutation, selection):
         n_pop = pop.shape[0]
@@ -329,7 +334,8 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
                     p1, p2 = np.random.randint(0, pop.shape[0], size=2)
                     if (p1 != i and p2 != i):
                         while (True):
-                            p3 = np.random.randint(0, pop.shape[0] / 2, size=1)
+                            #p3 = np.random.randint(0, pop.shape[0] / 2, size=1)
+                            p3 = tournament(pop, fitness, k)
                             if (p1 != p3 and p2 != p3 and p3 != i):
                                 break
                         if DEBUG_T == 1:
@@ -344,27 +350,9 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
                 child1, child2 = cross_two_point(u, pop[i])
                 child1 = np.array(child1)
                 child2 = np.array(child2)
-                #child1 = 1 * child1 + random_noise(n_vars, p_mutation)  # / 2)
-                #child2 = 1 * child2 + random_noise(n_vars, p_mutation)  # / 2)
+                child1 = 1 * child1 + random_noise(n_vars, p_mutation)  # / 2)
+                child2 = 1 * child2 + random_noise(n_vars, p_mutation)  # / 2)
                 #TODO mutate before or after crossover might different?
-                """
-                l = [x, u, v]
-                
-                f = evaluate(env, l)[:, 0]
-
-                # print(np.shape(x), np.shape(v), np.shape(u), np.shape(f), f, np.shape(l[np.argmax(f)]))
-                if f[0] >= f[1]:
-                    if f[0] >= f[2]:
-                        child = l[0]  # = np.vstack((child_new, l[0]))
-                    else:
-                        child = l[2]  # child_new = np.vstack((child_new, l[2]))
-                else:
-                    if f[1] >= f[2]:
-                        child = l[1]  # child_new = np.vstack((child_new, l[1]))
-                    else:
-                        child = l[2]  # child_new = np.vstack((child_new, l[2]))
-                        
-                        """
                 if i == 0:
                     child_new = [child1,child2]
                 else:
@@ -379,7 +367,7 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
                 i += 1
                 # if (i == 0 and DEBUG_T == 1):
                 # print("crossover parent: ", pop[parent1])
-                child1, child2 = cross_two_point(pop[parent1], pop[parent2])
+                child1, child2 = cross_two_point(pop[parent1] + random_noise(n_pop,p_mutation), pop[parent2])
                 # if (i == 0 and DEBUG_T == 1):
                 # print("crossover: ", child1, child2)
                 child1 = np.array(child1)
@@ -448,11 +436,6 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
 
         return ultimate_best
 
-    def select_best(n_pop, pop, fitness, player_hp, enemy_hp, time):
-        index = np.argpartition(fitness, n_pop)[-n_pop:]
-
-        return pop[index], fitness[index], player_hp[index], enemy_hp[index], time[index]
-
     def evolution(pop, ultimate_best, selection="default"):
         """
         Evolution Steps:
@@ -477,9 +460,6 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
             print("-- Generation %i --" % current_g)
 
             # 1. mate and crossover and/or mutate
-            if selection == "DE":
-                pop, fitness, player_hp, enemy_hp, time = \
-                    select_best(n_pop, pop, fitness, player_hp, enemy_hp, time)
             offspring = np.array(crossover_mutate(env, pop, fitness, n_pop, p_mutation, selection))
             # 2. evaluate offspring
             if (DEBUG_T == 1):
@@ -497,9 +477,9 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
 
             # 3. survive select
             survivors, fitness_new, php_new, ehp_new, time_new = \
-                shuffle_tournament_survivor(n_pop, pop, fitness, player_hp, enemy_hp, time)
+                round_robin_tournament_survivor(n_pop, pop, fitness, player_hp, enemy_hp, time)
+            # shuffle_tournament_survivor(n_pop, pop, fitness, player_hp, enemy_hp, time)
             # select_best(n_pop, pop, fitness, player_hp, enemy_hp, time)
-
             # Replace old pop by selected pop
             pop = survivors[:]
             fitness = fitness_new[:]
