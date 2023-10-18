@@ -188,29 +188,6 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
 
     def random_noise(num_vars, p_mutations):
         return uniform_noise(num_vars, p_mutations)
-
-    def tournament(pop, fitness, k):
-        parents = np.random.randint(0, pop.shape[0], size=k)
-        pn = np.argmax(parents)
-        return pn
-
-    def tournament_select(pop, k, fitness):
-        chosen = []
-        for i in range(k):
-            chosen = np.append(chosen, tournament(pop, fitness, k))
-        # if (DEBUG_T == 1):
-        #    print(chosen[0])
-        return chosen
-
-    def tournament_322(p1, p2, p3, fitness):
-        if fitness[p1] > fitness[p2]:
-            return p1, p2 if fitness[p2] > fitness[p3] else p1, p3
-        else:
-            return p1, p2 if fitness[p1] > fitness[p3] else p2, p3
-
-    def tournament_221(p1, p2, pop, fitness):
-        return p1 if fitness[p1] > fitness[p2] else p2
-
     def cross_two_point(ind1, ind2):
         """Executes a two-point crossover on the input :term:`sequence`
                     individuals. The two individuals are modified in place and both keep
@@ -237,61 +214,6 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
             = ind2[cxpoint1:cxpoint2], ind1[cxpoint1:cxpoint2]
 
         return ind1, ind2
-
-    def shuffle_tournament_survivor(n_pop, pop, fitness, player_hp, enemy_hp, time):
-        new_pop = []
-        new_fitness = []  # = fitness[:]
-        new_php = []  # player_hp[:]
-        new_ehp = []  # enemy_hp[:]
-        new_time = []  # time[:]
-        index_pop = random.sample(range(0, np.shape(pop)[0]), np.shape(pop)[0])
-        if DEBUG_T == 1:
-            pass  # print(index_pop, "\n", np.shape(index_pop), np.shape(pop))
-        for i in range(n_pop):
-            if i == 0:
-                pn = np.argmax(fitness)
-                new_pop = [pop[pn]]
-            else:
-                p1 = index_pop[i]
-                p2 = index_pop[i + n_pop]
-                pn = tournament_221(p1, p2, pop, fitness)
-                if selection == "DE":
-                    pn = tournament_221(pn, index_pop[i + 2 * n_pop], pop, fitness)
-                l = [pop[pn]]
-                new_pop = np.vstack((new_pop, l))
-            l2 = [fitness[pn], player_hp[pn], enemy_hp[pn], time[pn]]
-            new_fitness.append(l2[0])
-            new_php.append(l2[1])
-            new_ehp.append(l2[2])
-            new_time.append(l2[3])
-            # print("shape of result ", np.shape(new_pop))
-            # print("shape of fit result ", np.shape(fitness), np.shape(new_fitness))
-
-        return new_pop, new_fitness, new_php, new_ehp, new_time
-    def round_robin_tournament(p1, k, pop, fitness):
-        contestants = np.random.randint(0, pop.shape[0], size=k+1)
-        win = 0
-        for contestant in contestants:
-            if p1 == contestant:
-                continue
-            if fitness[p1] >= fitness[contestant]:
-                win += 1
-        return win
-    def round_robin_tournament_survivor(n_pop, pop, fitness, player_hp, enemy_hp, time):
-        wins = []
-        for i in range(np.shape(pop)[0]):
-            wins.append(round_robin_tournament(i, 10, pop, fitness))
-        wins_arg = np.argsort(wins)[-n_pop:]
-        new_pop = pop[wins_arg] #best n pop winners
-        new_fitness = [wins_arg]  # = fitness[:]
-        new_php = [wins_arg]  # player_hp[:]
-        new_ehp = [wins_arg]  # enemy_hp[:]
-        new_time = [wins_arg]  # time[:]
-        # print("shape of result ", np.shape(new_pop))
-        # print("shape of fit result ", np.shape(fitness), np.shape(new_fitness))
-        return new_pop, new_fitness, new_php, new_ehp, new_time
-
-
     def crossover_mutate(env, pop, fitness, k, p_mutation, selection):
         n_pop = pop.shape[0]
 
@@ -380,62 +302,80 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
                 # print("shape3 ", np.shape(child_new))
         return child_new
 
-    def configure_results(pop, fitness, player_hp, enemy_hp, time, generation, ultimate_best):
+    def tournament(pop, fitness, k):
+        parents = np.random.randint(0, pop.shape[0], size=k)
+        pn = np.argmax(parents)
+        return pn
 
-        # mean
-        data_fitness['mean'] = np.append(data_fitness['mean'], np.mean(fitness))
-        data_player_hp['mean'] = np.append(data_player_hp['mean'], np.mean(player_hp))
-        data_enemy_hp['mean'] = np.append(data_enemy_hp['mean'], np.mean(enemy_hp))
-        data_time['mean'] = np.append(data_time['mean'], np.mean(time))
+    def tournament_select(pop, k, fitness):
+        chosen = []
+        for i in range(k):
+            chosen = np.append(chosen, tournament(pop, fitness, k))
+        # if (DEBUG_T == 1):
+        #    print(chosen[0])
+        return chosen
 
-        # std
-        data_fitness['std'] = np.append(data_fitness['std'], np.std(fitness))
-        data_player_hp['std'] = np.append(data_player_hp['std'], np.std(player_hp))
-        data_enemy_hp['std'] = np.append(data_enemy_hp['std'], np.std(enemy_hp))
-        data_time['std'] = np.append(data_time['std'], np.std(time))
+    def tournament_322(p1, p2, p3, fitness):
+        if fitness[p1] > fitness[p2]:
+            return p1, p2 if fitness[p2] > fitness[p3] else p1, p3
+        else:
+            return p1, p2 if fitness[p1] > fitness[p3] else p2, p3
 
-        # max
-        data_fitness['max'] = np.append(data_fitness['max'], np.max(fitness))
-        data_player_hp['max'] = np.append(data_player_hp['max'], np.max(player_hp))
-        data_enemy_hp['max'] = np.append(data_enemy_hp['max'], np.max(enemy_hp))
-        data_time['max'] = np.append(data_time['max'], np.max(time))
+    def tournament_221(p1, p2, pop, fitness):
+        return p1 if fitness[p1] > fitness[p2] else p2
 
-        index_best = np.argmax(fitness)
-        pop_best = pop[index_best]
-        fitness_best = fitness[index_best]
+    def shuffle_tournament_survivor(n_pop, pop, fitness, player_hp, enemy_hp, time):
+        new_pop = []
+        new_fitness = []  # = fitness[:]
+        new_php = []  # player_hp[:]
+        new_ehp = []  # enemy_hp[:]
+        new_time = []  # time[:]
+        index_pop = random.sample(range(0, np.shape(pop)[0]), np.shape(pop)[0])
+        if DEBUG_T == 1:
+            pass  # print(index_pop, "\n", np.shape(index_pop), np.shape(pop))
+        for i in range(n_pop):
+            if i == 0:
+                pn = np.argmax(fitness)
+                new_pop = [pop[pn]]
+            else:
+                p1 = index_pop[i]
+                p2 = index_pop[i + n_pop]
+                pn = tournament_221(p1, p2, pop, fitness)
+                if selection == "DE":
+                    pn = tournament_221(pn, index_pop[i + 2 * n_pop], pop, fitness)
+                l = [pop[pn]]
+                new_pop = np.vstack((new_pop, l))
+            l2 = [fitness[pn], player_hp[pn], enemy_hp[pn], time[pn]]
+            new_fitness.append(l2[0])
+            new_php.append(l2[1])
+            new_ehp.append(l2[2])
+            new_time.append(l2[3])
+            # print("shape of result ", np.shape(new_pop))
+            # print("shape of fit result ", np.shape(fitness), np.shape(new_fitness))
 
-        print("  Min %s" % min(fitness))
-        print("  Avg %s" % np.mean(fitness))
-        print("  Std %s" % np.std(fitness))
-
-        print("  best fitness: %s" % fitness_best)
-        print("  player_hp: %s" % player_hp[index_best])
-        print("  enemy_hp: %s" % enemy_hp[index_best])
-        print("  time: %s " % time[index_best])
-
-        if fitness_best > ultimate_best:
-            print("ultimate best %s :" % index_best)
-            ultimate_best = fitness_best
-            np.savetxt(env.experiment_name + "/best.txt", pop_best)
-        if fitness_best > winner["fitness"]:
-            print("WINNER")
-            winner["solution"] = pop_best
-            winner["fitness"] = fitness_best
-
-        genlist.append(generation)
-        data_bestfit['fitness'] = np.append(data_bestfit['fitness'], fitness_best)
-        data_bestfit['player_hp'] = np.append(data_bestfit['player_hp'], player_hp[index_best])
-        data_bestfit['enemy_hp'] = np.append(data_bestfit['enemy_hp'], enemy_hp[index_best])
-        data_bestfit['time'] = np.append(data_bestfit['time'], time[index_best])
-
-        # save result of each generation
-        # file_aux  = open(experiment_name+'/results.txt','a')
-        # file_aux.write('\n\ngen best mean std')
-        # file_aux.write('\n'+str(generation)+' '+str(round(max_fitness,6))+' '+str(round(mean,6))+' '+str(round(std,6))   )
-        # file_aux.close()
-
-        return ultimate_best
-
+        return new_pop, new_fitness, new_php, new_ehp, new_time
+    def round_robin_tournament(p1, k, pop, fitness):
+        contestants = np.random.randint(0, pop.shape[0], size=k+1)
+        win = 0
+        for contestant in contestants:
+            if p1 == contestant:
+                continue
+            if fitness[p1] >= fitness[contestant]:
+                win += 1
+        return win
+    def round_robin_tournament_survivor(n_pop, pop, fitness, player_hp, enemy_hp, time):
+        wins = []
+        for i in range(np.shape(pop)[0]):
+            wins.append(round_robin_tournament(i, 10, pop, fitness))
+        wins_arg = np.argsort(wins)[-n_pop:]
+        new_pop = pop[wins_arg] #best n pop winners
+        new_fitness = [wins_arg]  # = fitness[:]
+        new_php = [wins_arg]  # player_hp[:]
+        new_ehp = [wins_arg]  # enemy_hp[:]
+        new_time = [wins_arg]  # time[:]
+        # print("shape of result ", np.shape(new_pop))
+        # print("shape of fit result ", np.shape(fitness), np.shape(new_fitness))
+        return new_pop, new_fitness, new_php, new_ehp, new_time
     def evolution(pop, ultimate_best, selection="default"):
         """
         Evolution Steps:
@@ -499,6 +439,61 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
                 save_pop(pop)
                 print_2_csv(current_g)
         return pop
+    def configure_results(pop, fitness, player_hp, enemy_hp, time, generation, ultimate_best):
+
+        # mean
+        data_fitness['mean'] = np.append(data_fitness['mean'], np.mean(fitness))
+        data_player_hp['mean'] = np.append(data_player_hp['mean'], np.mean(player_hp))
+        data_enemy_hp['mean'] = np.append(data_enemy_hp['mean'], np.mean(enemy_hp))
+        data_time['mean'] = np.append(data_time['mean'], np.mean(time))
+
+        # std
+        data_fitness['std'] = np.append(data_fitness['std'], np.std(fitness))
+        data_player_hp['std'] = np.append(data_player_hp['std'], np.std(player_hp))
+        data_enemy_hp['std'] = np.append(data_enemy_hp['std'], np.std(enemy_hp))
+        data_time['std'] = np.append(data_time['std'], np.std(time))
+
+        # max
+        data_fitness['max'] = np.append(data_fitness['max'], np.max(fitness))
+        data_player_hp['max'] = np.append(data_player_hp['max'], np.max(player_hp))
+        data_enemy_hp['max'] = np.append(data_enemy_hp['max'], np.max(enemy_hp))
+        data_time['max'] = np.append(data_time['max'], np.max(time))
+
+        index_best = np.argmax(fitness)
+        pop_best = pop[index_best]
+        fitness_best = fitness[index_best]
+
+        print("  Min %s" % min(fitness))
+        print("  Avg %s" % np.mean(fitness))
+        print("  Std %s" % np.std(fitness))
+
+        print("  best fitness: %s" % fitness_best)
+        print("  player_hp: %s" % player_hp[index_best])
+        print("  enemy_hp: %s" % enemy_hp[index_best])
+        print("  time: %s " % time[index_best])
+
+        if fitness_best > ultimate_best:
+            print("ultimate best %s :" % index_best)
+            ultimate_best = fitness_best
+            np.savetxt(env.experiment_name + "/best.txt", pop_best)
+        if fitness_best > winner["fitness"]:
+            print("WINNER")
+            winner["solution"] = pop_best
+            winner["fitness"] = fitness_best
+
+        genlist.append(generation)
+        data_bestfit['fitness'] = np.append(data_bestfit['fitness'], fitness_best)
+        data_bestfit['player_hp'] = np.append(data_bestfit['player_hp'], player_hp[index_best])
+        data_bestfit['enemy_hp'] = np.append(data_bestfit['enemy_hp'], enemy_hp[index_best])
+        data_bestfit['time'] = np.append(data_bestfit['time'], time[index_best])
+
+        # save result of each generation
+        # file_aux  = open(experiment_name+'/results.txt','a')
+        # file_aux.write('\n\ngen best mean std')
+        # file_aux.write('\n'+str(generation)+' '+str(round(max_fitness,6))+' '+str(round(mean,6))+' '+str(round(std,6))   )
+        # file_aux.close()
+
+        return ultimate_best
     def save_pop(pop):
         np.savetxt(env.experiment_name  + "/population.txt", pop)
     def print_2_csv(eponum = None, selection_tmp = None):
@@ -518,7 +513,6 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
                                      data_bestfit['fitness'][i], data_bestfit['player_hp'][i],
                                      data_bestfit['enemy_hp'][i], data_bestfit['time'][i]
                                      ])
-
     def coenvolve(pop1, pop2):
         pop = np.vstack((pop1, pop2))
         current_g = 0
@@ -534,7 +528,6 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
         # Replace old pop by selected pop
         pop = survivors[:]
         return evolution(pop, -100, selection)
-
     def main(pop1, pop2):
         if mode == "all" and np.shape(pop2)[0] != 0 and np.shape(pop1)[0] != 0:
             pop = coenvolve(pop1, pop2)
