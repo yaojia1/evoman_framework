@@ -110,7 +110,7 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
     if pop1 is None:
         pop1 = []
     print("selection is "+str(selection)+"\nmode:"+str(mode))
-    selections = ["random", "DE"]
+    selections = [ "DE","random"]
     # initializes simulation in individual evolution mode, for single static enemy.
     if mode == "two":
         if not os.path.exists(experiment_name + "_" + selections[0]):
@@ -234,6 +234,7 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
                     individuals. The two individuals are modified in place and both keep
                     their original length.
 
+
                     :param ind1: The first individual participating in the crossover.
                     :param ind2: The second individual participating in the crossover.
                     :returns: A tuple of two individuals.
@@ -272,6 +273,8 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
                 p1 = index_pop[i]
                 p2 = index_pop[i + n_pop]
                 pn = tournament_221(p1, p2, pop, fitness)
+                if selection == "DE":
+                    pn = tournament_221(pn, index_pop[i + 2 * n_pop], pop, fitness)
                 l = [pop[pn]]
                 new_pop = np.vstack((new_pop, l))
             l2 = [fitness[pn], player_hp[pn], enemy_hp[pn], time[pn]]
@@ -325,12 +328,25 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
                 while (True):
                     p1, p2 = np.random.randint(0, pop.shape[0], size=2)
                     if (p1 != i and p2 != i):
+                        while (True):
+                            p3 = np.random.randint(0, pop.shape[0] / 2, size=1)
+                            if (p1 != p3 and p2 != p3 and p3 != i):
+                                break
+                        if DEBUG_T == 1:
+                            print("DE select basis vector:"+str(p1)+","+str(p2)+","+str(p3))
                         break
-                x = pop[i] + random_noise(n_vars, p_mutation)  # / 2)
+
+                x = pop[p3] #+ random_noise(n_vars, p_mutation)  # / 2)
                 v = pop[p1] - pop[p2]
                 #v = v + random_noise(n_vars, p_mutation)  # / 2)
-                child = x + alpha * v
+                u = x + alpha * v
                 #u = u + random_noise(n_vars, p_mutation)  # / 2)
+                child1, child2 = cross_two_point(u, pop[i])
+                child1 = np.array(child1)
+                child2 = np.array(child2)
+                #child1 = 1 * child1 + random_noise(n_vars, p_mutation)  # / 2)
+                #child2 = 1 * child2 + random_noise(n_vars, p_mutation)  # / 2)
+                #TODO mutate before or after crossover might different?
                 """
                 l = [x, u, v]
                 
@@ -350,10 +366,10 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
                         
                         """
                 if i == 0:
-                    child_new = [child]
+                    child_new = [child1,child2]
                 else:
-                    child_new = np.vstack((child_new, [child]))
-                # print(np.shape(child_new))
+                    child_new = np.vstack((child_new, [child1,child2]))
+                #print(np.shape(child_new))
         else:
             children = tournament_select(pop, k, fitness)
             i = 0
@@ -461,6 +477,9 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
             print("-- Generation %i --" % current_g)
 
             # 1. mate and crossover and/or mutate
+            if selection == "DE":
+                pop, fitness, player_hp, enemy_hp, time = \
+                    select_best(n_pop, pop, fitness, player_hp, enemy_hp, time)
             offspring = np.array(crossover_mutate(env, pop, fitness, n_pop, p_mutation, selection))
             # 2. evaluate offspring
             if (DEBUG_T == 1):
@@ -548,7 +567,7 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
     if mode == "two":
         pop_ini = init_pop(n_pop, n_vars)
         pop_old = pop_ini[:]
-        evolution(pop_ini, -100, "DE")
+        evolution(pop_ini, -100, selections[0])
 
         if not os.path.exists(experiment_name + "_" + selections[1]):
             os.makedirs(experiment_name + "_" + selections[1])
@@ -579,7 +598,7 @@ def generalist_train(experiment_name, enemies_in_group, selection, p_mutation = 
         data_bestfit = {'fitness': np.array([]), 'player_hp': np.array([]), 'enemy_hp': np.array([]),
                         'time': np.array([])}
 
-        evolution(pop_old, -100, "random")
+        evolution(pop_old, -100, selections[1])
     else:
         main(pop1, pop2)
 
@@ -786,7 +805,13 @@ if __name__ == '__main__':
     elif (args.mode == 'generation_test'):
         data = {'score': []}
         enemy_groups = {1: [1, 2, 3, 4, 5, 6, 7, 8]}  #, 2: [4, 6, 7], 3: [2, 6, 8]}
-        solution_names= ['group12345678_DE','group12345678_random']
+        solution_names = ['group12345678_p_0.2_DE',
+                         'group12345678_p_0.2_random',
+                         #'group2368_p_0.2_DE',
+                         #'group2368_p_0.2_random',
+                         #'group4567_p_0.2_DE',
+                         #'group4567_p_0.2_random',
+                         'solution']
         for exp_name in solution_names:
             for group_number, enemies_in_group in enemy_groups.items():
                 #exp_name = 'group12345678_DE'
@@ -800,11 +825,15 @@ if __name__ == '__main__':
                     score = test(l, group_number, exp_name)
                     data['score'].append(score)
                 """
+                win = 0
                 for i in range(8):
                     # exp_name = 'group12345678'
                     print(i)
                     score = test([i + 1], 1, exp_name)
+                    if score > 0 :
+                        win += 1
                     data['score'].append(score)
+                print("solution "+exp_name+" Win "+str(win)+" enemies! ")
 
 
         print(data['score'])
@@ -813,12 +842,12 @@ if __name__ == '__main__':
     elif (args.mode == 'generation_train'):
         print("------------------------------- START TRAIN -------------------------------------------------------")
         # --------- STARTS PROGRAM FOR EVERY ENEMY GROUP 10 TIMES ---------------
-        enemy_groups = {1: [2, 3, 6, 8], 2: [4, 5, 6, 7], 3: [1, 2, 3, 4, 5, 6, 7, 8], 4: [1, 2, 3, 4, 5, 6, 7, 8]}
+        enemy_groups = {1: [1, 2, 3, 4, 5, 6, 7, 8], 2: [2, 3, 6, 8], 3: [4, 5, 6, 7], 4: [1, 2, 3, 4, 5, 6, 7, 8]}
         pops = [1, 2, 3]
         for group_number, enemies_in_group in enemy_groups.items():
             group_name = ''.join(str(x) for x in enemies_in_group)
             print("------------ GROUP " + str(group_name) + " -------------------------------------------------------")
-            experiment_name = "group" + str(group_name)
+            experiment_name = "exp_1_" + str(group_name)
             if group_number < 3:
                 #continue
                 # pops[group_number-1] =
@@ -828,5 +857,5 @@ if __name__ == '__main__':
                 # pops[group_number - 1] = generalist_train(experiment_name, enemies_in_group, args.selection, mode="all",
                 # pop1=pops[0], pop2=pops[1])
             else:
-                #pass
-                generalist_train(experiment_name, enemies_in_group, None, mode="two")
+                pass
+                #generalist_train(experiment_name, enemies_in_group, None, mode="two")
