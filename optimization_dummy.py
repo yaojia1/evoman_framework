@@ -9,6 +9,7 @@
 import sys
 
 import numpy
+import stats as stats
 
 from evoman.environment import Environment
 from demo_controller import player_controller
@@ -23,6 +24,11 @@ from time import sleep
 from deap import base
 import random
 import csv
+import seaborn as sns
+import numpy as np
+from scipy import stats
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from random import shuffle
 DEBUG_T = 1
 RESERVE_Best = 5
@@ -764,7 +770,7 @@ def test(enemy_number, index = 0, exp_name = None):
 
     print('fitness {}, player_hp {}, enemy_hp {}, time {}'.format(fitness, player_hp, enemy_hp, time))
 
-    return player_hp - enemy_hp
+    return player_hp - enemy_hp, player_hp, enemy_hp, fitness
 
 if __name__ == '__main__':
 
@@ -810,7 +816,7 @@ if __name__ == '__main__':
             pickle.dump(data, file)
 
     elif (args.mode == 'generation_test'):
-        data = {'score': [], 'win': []}
+        data = {'score': [], 'win': [], 'fitness': []}
         test_group = [1, 2, 3, 4, 5, 6, 7, 8]
         exp_groups = {1: 'exp_5_26', 2: 'exp_5_78'}
         selection_names = [  # 'exp_3_12345678_k_2_DE',
@@ -824,11 +830,48 @@ if __name__ == '__main__':
             '_DE', '_tournament']
         epo = 0
         exp_runs = 10
-        for exp_name in selection_names:
+        '''print data'''
+
+        # open the file in universal line ending mode
+        """
+        best_data = [[87.06728120673463, 84.49191706183109, 86.97853908213779, 88.89616819497442, 89.428353948145,
+                      84.84394224923466, 89.49282822853992, 85.67959913428288, 88.18254710353531, 90.3917329693055],
+                     [90.50669517527555, 89.13173296930549, 89.90660195700339, 88.91520306650935, 90.03282822853991,
+                      88.89686730400923, 89.00322500981417, 90.2917323025988, 90.63289246928258, 89.38506424239105],
+                     [90.67968822339262, 90.45289246928257, 90.87289246928256, 89.54669517527554, 90.31003982910278,
+                      91.05282822853991, 90.02661051127251, 90.02661051127251, 89.41669509194095, 90.97106227384336],
+                     [92.01679627126202, 90.43482255552047, 91.71679627126204, 90.63289246928255, 90.80669517527554,
+                      91.31758228947824, 92.96355803717009, 90.74661051127251, 91.4587078342906, 92.49173296930547]
+                     ]
+        data_array_26 = np.array([best_data[0], best_data[1]])
+        data_array_78 = np.array([best_data[2], best_data[3]])
+        count = [[0 for i in range(17)] for k in range(4)]
+        for i in range(4):
+            for da in best_data[i]:
+                count[i][int(da - 80)] += 1
+        print(count)
+        xs = np.arange(80, 97)
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        for y in range(2):
+            z = count[y]
+            ax.bar(xs, z, zs=y, zdir='y', alpha=0.8)
+
+        ax.set_xlabel('fitness')
+        ax.set_ylabel('EA')
+        ax.set_zlabel('count')
+
+        plt.show()
+        """
+        best_gain = 0
+        best_beat = 0
+        php_record = [[] for i in range(40)]
+        ehp_record = [[] for i in range(40)]
+        for group_number, enemies_in_group in exp_groups.items():
             # data.add({exp_name:[]})
-            for group_number, enemies_in_group in exp_groups.items():
-                """
+            for exp_name in selection_names:
                 # exp_name = 'group12345678_DE'
+                """
                 print(enemies_in_group)
                 score = test(enemies_in_group, group_number, exp_name)
                 data['score'].append(score)
@@ -846,37 +889,86 @@ if __name__ == '__main__':
                     for i in range(8):
                         # exp_name = 'group12345678'
                         print(enemies_in_group + exp_name + ": " + str(i + 1))
-                        score_tmp = 0
+                        score_tmp, php, ehp = 0, 0, 0
                         for k in range(5):
-                            score_tmp += test([i + 1], 1, exp_name = enemies_in_group + exp_name + "/" + str(runs+1))
+                            s, php, ehp, fit = test([i + 1], 1, exp_name = enemies_in_group + exp_name + "/" + str(runs+1))
+                            score_tmp += s
                         score_tmp /= 5
                         if score_tmp > 0:
                             win += 1
                         data['score'][epo*exp_runs+runs] += score_tmp
-                    data['score'][epo*exp_runs+runs] /= 8
+                        php_record[epo * exp_runs + runs].append(php)
+                        ehp_record[epo * exp_runs + runs].append(ehp)
+                    #data['score'][epo*exp_runs+runs]
                     data['win'][epo*exp_runs+runs] = win
+                    s, php, ehp, fit_tmp = test(test_group, 1, exp_name = enemies_in_group + exp_name + "/" + str(runs+1))
+                    data['fitness'].append(fit_tmp)
                     print("solution " + enemies_in_group + exp_name + " Win " + str(win) + " enemies! ")
                 print(data['score'][epo*exp_runs:(epo+1)*exp_runs])
                 print(data['win'][epo*exp_runs:(epo+1)*exp_runs])
                 epo += 1
 
-        with open('solution/results_all2.csv', 'a+', newline='') as csvfile:
+        gwin = np.argmax(data['score'])
+        bwin = np.argmax(data['win'])
+        with open('solution/results_all6.csv', 'a+', newline='') as csvfile:
             filewriter = csv.writer(csvfile, delimiter=',')
-            headline = ["solution"] + [str(k + 1) for k in range(exp_runs)]
+            headline = ["solution"] + [str(k + 1) for k in range(exp_runs)] * 2
             filewriter.writerow(headline)
             i = 0
-            for exp_name in selection_names:
+            for group_number, enemies_in_group in exp_groups.items():
                 # data.add({exp_name:[]})
-                for group_number, enemies_in_group in exp_groups.items():
+                for exp_name in selection_names:
                     filewriter.writerow(
-                        [enemies_in_group + exp_name ] + data['score'][i:i+exp_runs] + data['win'][i:i+exp_runs]
+                        [enemies_in_group + exp_name ] + data['score'][i:i+exp_runs] + data['win'][i:i+exp_runs] + data['fitness'][i:i+exp_runs]
                     )
                     print(i)
-                    print([enemies_in_group + exp_name ] + data['score'][i:i+exp_runs])
+                    print([enemies_in_group + exp_name ] + data['score'][i:i+exp_runs] + data['win'][i:i+exp_runs] + data['fitness'][i:i+exp_runs])
                     i += exp_runs
-
+            headline = ["solution", "runs"] + [str(k + 1) for k in range(8)] * 2
+            filewriter.writerow(headline)
+            nmb = 0
+            for group_number, enemies_in_group in exp_groups.items():
+                # data.add({exp_name:[]})
+                for exp_name in selection_names:
+                    for run in range(exp_runs):
+                        filewriter.writerow(
+                            [enemies_in_group + exp_name, str(run+1)] + php_record[nmb*exp_runs+run] + ehp_record[nmb*exp_runs+run]
+                        )
+                nmb += 1
         print(data['score'])
         print(data['win'])
+        print("best gain:", gwin, "\n player hp:", php_record[gwin], "\nenemy hp:", ehp_record[gwin])
+        print("best beat number:", bwin, "\n player hp:", php_record[bwin], "\nenemy hp:", ehp_record[bwin])
+        print("26 gain mean std")
+        print("DE", np.mean(data['score'][:10]), np.std(data['score'][:10]))
+        print("tournament", np.mean(data['score'][10:20]), np.std(data['score'][10:20]))
+        print("78 gain mean std")
+        print("DE", np.mean(data['score'][20:30]), np.std(data['score'][20:30]))
+        print("tournament", np.mean(data['score'][30:40]), np.std(data['score'][30:40]))
+        print("26 fitness mean std")
+        print("DE", np.mean(data['fitness'][:10]), np.std(data['fitness'][:10]))
+        print("tournament", np.mean(data['fitness'][10:20]), np.std(data['fitness'][10:20]))
+        print("78 gain mean std")
+        print("DE", np.mean(data['fitness'][20:30]), np.std(data['fitness'][20:30]))
+        print("tournament", np.mean(data['fitness'][30:40]), np.std(data['fitness'][30:40]))
+
+        t_stat, p_value = stats.ttest_ind(data['score'][:10], data['score'][10:20])
+        print("t-test 26:",t_stat,p_value)
+        t_stat, p_value = stats.ttest_ind(data['score'][20:30], data['score'][30:40])
+        print("t-test 78:", t_stat, p_value)
+        t_stat, p_value = stats.ttest_ind(data['score'][:10], data['score'][20:30])
+        print("t-test DE:", t_stat, p_value)
+        t_stat, p_value = stats.ttest_ind(data['score'][10:20], data['score'][30:40])
+        print("t-test tournament:", t_stat, p_value)
+
+        t_stat, p_value = stats.ttest_ind(data['fitness'][:10], data['fitness'][10:20])
+        print("t-test 26:", t_stat, p_value)
+        t_stat, p_value = stats.ttest_ind(data['fitness'][20:30], data['fitness'][30:40])
+        print("t-test 78:", t_stat, p_value)
+        t_stat, p_value = stats.ttest_ind(data['fitness'][:10], data['fitness'][20:30])
+        print("t-test DE:", t_stat, p_value)
+        t_stat, p_value = stats.ttest_ind(data['fitness'][10:20], data['fitness'][30:40])
+        print("t-test tournament:", t_stat, p_value)
 
 
     elif (args.mode == 'generation_train'):
