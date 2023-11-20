@@ -25,6 +25,7 @@ hard-coded:
 * offspring size: 200
 * epoch = 40
 * keep_rate = 20 (not in use)
+
 for calling:
 * runs: number of times run
 * selection: [DE|tournament]
